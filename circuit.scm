@@ -1,7 +1,8 @@
 ;;; 2022 Sept. 02
-;;; A simlpe Scheme program to calculate network impedance
+;;; A simlpe Scheme program to calculate network impedance, symbolically!
 ;;;
 ;;; Long He
+;;; helong_ms@outlook.com
 
 (define nil ())
 
@@ -29,6 +30,11 @@
   (cond ((null? s) s)
         ((eq? (car s) element) (cdr s))
         (else (cons (car s) (rm-set element (cdr s))))))
+
+(define (-set s1 s2)
+  (if (null? s2)
+      s1
+      (-set (rm-set (car s2) s1) (cdr s2))))
 
 ;;; merge two set into one set
 (define (make-set new-set old-set)
@@ -71,6 +77,7 @@
   elements)
 
 ;;; element selector
+;;; return a list of elements
 (define (sel-element network node-pair)
   (define (same-node-pair? element)
     (pair-eq? (element-nodes element) node-pair))
@@ -88,6 +95,12 @@
 ;;; Abstraction Barriers: NETWORK
 ;;; =========================
 
+(define (parallel-vals elements)
+  (cons '|| (map element-name elements)))
+
+(define (other-nodes all-set nodes)
+  (-set all-set nodes))
+
 (define (add-element network element)
   (init-network (cons element (all-elements network))))
 
@@ -101,7 +114,6 @@
        (rm-element network (car (sel-element network nodes)))
        nodes)))
 
-
 (define (neighbors network node)
   (filter
    (lambda(x)
@@ -109,19 +121,74 @@
    (all-nodes network)))
 
 
-(define (impedance network node-pair)
-  (define (clean? network)
-    (= 2 (length (network (all-nodes-option)))))
+(define (rm-series-node network node)
+  (let* ((nodeA (car (neighbors network node)))
+        (nodeB (cadr (neighbors network node)))
+        (valA (parallel-vals (sel-element network (list node nodeA))))
+        (valB (parallel-vals (sel-element network (list node nodeB))))
+        (valSeries (list '+ valA valB))
+        (eleSeries (make-element (list (list nodeA nodeB) 'r valSeries))))
+    (rm-betwn-nodes (rm-betwn-nodes (add-element network eleSeries) (list node nodeB)) (list node nodeA))
+    )
   )
 
 
+(define (rm-open-node network node)
+  (let* ((nodeA (car (neighbors network node))))
+    (rm-betwn-nodes network (list node nodeA))))
+
+(define (reduce-network network node-pair)
+  (define (series? node)
+    (= 2 (length (neighbors network node))))
+  (define (open? node)
+    (= 1 (length (neighbors network node))))
+  (define (series-nodes network node-pair)
+    (filter series? (other-nodes (all-nodes network) node-pair)))
+  (define (open-nodes network node-pair)
+    (filter open? (other-nodes (all-nodes network) node-pair)))
+  (define (series-node network node-pair)
+    (car (series-nodes network node-pair)))
+  (define (open-node network node-pair)
+    (car (open-nodes network node-pair)))
+  (define (has-series-node network node-pair)
+    (not (null? (series-nodes network node-pair))))
+  (define (has-open-node network node-pair)
+    (not (null? (open-nodes network node-pair))))
+  (cond ((has-open-node network node-pair)
+         (rm-open-node network (open-node network node-pair)))
+        ((has-series-node network node-pair)
+         (rm-series-node network (series-node network node-pair)))
+        (else
+         'fail-reduce-network))
+  )
+
+
+(define (impedance network node-pair)
+  (define (clean? network)
+    (= 2 (length (all-nodes network))))
+  (if (clean? network)
+      (parallel-vals (sel-element network node-pair))
+      (impedance (reduce-network network node-pair) node-pair))
+  )
+
+
+;;; TODO
+;;; pattern matching to simplify result
+
+;;; Testing
 (define elements
   (map make-element '(((n1 n2) r r1) ((n2 gnd) r r2))))
 
 (define network (init-network elements))
 (define network
-  (add-element network (make-element '((n2 n3) r r3))))
+  (add-element network (make-element '((gnd n1) r r3))))
+
 (define network
-  (add-element network (make-element '((n1 n2) r r4))))
-;;(define network (add-element network (list 'n2 'gnd) 'r 'r2))
+  (add-element network (make-element '((gnd n3) r r4))))
+
+(define network
+  (add-element network (make-element '((n1 n3) r r5))))
+
+(define network
+  (add-element network (make-element '((n2 n3) r r6))))
 
