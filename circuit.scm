@@ -62,6 +62,10 @@
 (define element-type cadr)
 
 (define element-name caddr)
+
+
+(define (parallel-vals elements)
+  (cons '|| (map element-name elements)))
 ;;;
 ;;; Abstraction: ELEMENT
 ;;; =======================
@@ -95,8 +99,6 @@
 ;;; Abstraction Barriers: NETWORK
 ;;; =========================
 
-(define (parallel-vals elements)
-  (cons '|| (map element-name elements)))
 
 (define (other-nodes all-set nodes)
   (-set all-set nodes))
@@ -107,6 +109,13 @@
 (define (rm-element network element)
   (init-network (delete element (all-elements network))))
 
+(define (neighbors network node)
+  (filter
+   (lambda(x)
+     (not (null? (sel-element network (list x node)))))
+   (all-nodes network)))
+
+
 (define (rm-betwn-nodes network nodes)
   (if (null? (sel-element network nodes))
       network
@@ -114,11 +123,6 @@
        (rm-element network (car (sel-element network nodes)))
        nodes)))
 
-(define (neighbors network node)
-  (filter
-   (lambda(x)
-     (not (null? (sel-element network (list x node)))))
-   (all-nodes network)))
 
 
 (define (rm-series-node network node)
